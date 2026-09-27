@@ -86,7 +86,7 @@ brand_logo, brand_name = st.columns([1, 3.5])
 with brand_logo:
     st.image(
         ROOT / "firstcity_logo.jpeg",
-        width=260
+        width=220
     )
 
 with brand_name:

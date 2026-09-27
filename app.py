@@ -85,15 +85,14 @@ brand_logo, brand_name = st.columns([1, 3.5])
 
 with brand_logo:
     st.image(
-        ROOT / "firstcity_logo.jpeg",
-        width=220
+        ROOT / "firstcity_logo.png",
+        width=280
     )
 
 with brand_name:
     st.markdown(
         """
-        ### [First City | المدينة الأولى](https://firstcity.sa/ar)
-        **Research & Innovation | البحث والابتكار**
+        ### [Research, Development & Innovation Center | مركز البحث والتطوير والابتكار](https://firstcity.sa/ar/research)
         """
     )
 

@@ -79,7 +79,29 @@ intro = (
     if ar else
     "An explainable monitoring prototype that combines multiple anomaly signals, protects legitimate weather extremes, and routes suspicious observations for human review."
 )
-st.markdown(f'<div class="hero"><h1>🌦️ {title}</h1><p>{intro}</p></div>', unsafe_allow_html=True)
+
+# First City branding
+brand_logo, brand_name = st.columns([1, 3.5])
+
+with brand_logo:
+    st.image(
+        ROOT / "firstcity_logo.jpeg",
+        width=260
+    )
+
+with brand_name:
+    st.markdown(
+        """
+        ### [First City | المدينة الأولى](https://firstcity.sa/ar)
+        **Research & Innovation | البحث والابتكار**
+        """
+    )
+
+# MeteoGuard heading
+st.markdown(
+    f'<div class="hero"><h1>🌦️ {title}</h1><p>{intro}</p></div>',
+    unsafe_allow_html=True
+)
 
 names = ["نظرة عامة", "مستكشف التنبيهات", "التقييم", "حول النظام"] if ar else [
     "Overview", "Alert explorer", "Evaluation", "About"

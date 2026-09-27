@@ -79,21 +79,49 @@ intro = (
     if ar else
     "An explainable monitoring prototype that combines multiple anomaly signals, protects legitimate weather extremes, and routes suspicious observations for human review."
 )
+# Add spacing above the First City header
+st.markdown(
+    "<div style='height: 14px;'></div>",
+    unsafe_allow_html=True
+)
 
 # First City branding
-brand_logo, brand_name = st.columns([1, 3.5])
+brand_logo, brand_name = st.columns(
+    [1.1, 4.9],
+    vertical_alignment="center"
+)
 
 with brand_logo:
     st.image(
         ROOT / "firstcity_logo.png",
-        width=320
+        width=240
     )
 
 with brand_name:
     st.markdown(
         """
-        ### [Research, Development & Innovation Center | مركز البحث والتطوير والابتكار](https://firstcity.sa/ar/research)
-        """
+        <div style="
+            padding-top: 4px;
+            line-height: 1.35;
+        ">
+            <a
+                href="https://firstcity.sa/ar/research"
+                target="_blank"
+                style="
+                    font-size: clamp(16px, 1.6vw, 21px);
+                    font-weight: 600;
+                    color: #0057a8;
+                    text-decoration: none;
+                "
+            >
+                Research, Development & Innovation Center
+                <span style="white-space: nowrap;">
+                    | مركز البحث والتطوير والابتكار
+                </span>
+            </a>
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
 # MeteoGuard heading
@@ -101,7 +129,6 @@ st.markdown(
     f'<div class="hero"><h1>🌦️ {title}</h1><p>{intro}</p></div>',
     unsafe_allow_html=True
 )
-
 names = ["نظرة عامة", "مستكشف التنبيهات", "التقييم", "حول النظام"] if ar else [
     "Overview", "Alert explorer", "Evaluation", "About"
 ]

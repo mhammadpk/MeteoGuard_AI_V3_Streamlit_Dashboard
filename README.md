@@ -1,4 +1,4 @@
-# MeteoGuard AI V3.1 Dashboard
+# MeteoGuard AI V3.2 Dashboard
 
 An explainable meteorological observation-quality monitoring and alert-triage prototype prepared for hackathon demonstration.
 
@@ -20,3 +20,5 @@ python -m streamlit run app.py
 ## Scope
 
 The prototype uses public NOAA observations and controlled sensor-fault scenarios. Proposed values are decision-support recommendations that require human review. This is not an operational NCM system.
+
+V3.2 adds an interactive station tooltip, a station-table fallback, complete Arabic chart/table labels, and project/data-source links.

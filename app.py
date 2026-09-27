@@ -1,8 +1,8 @@
 from pathlib import Path
 import pandas as pd
 import plotly.express as px
-import streamlit as st
 import pydeck as pdk
+import streamlit as st
 
 st.set_page_config(page_title="MeteoGuard AI", page_icon="🌦️", layout="wide")
 ROOT = Path(__file__).resolve().parent
@@ -30,6 +30,31 @@ SPLIT = {
 STATUS = {
     "suggest correction": "Review proposed correction",
     "human review": "Human review required",
+}
+VAR_AR = {
+    "dewpoint_c": "نقطة الندى (°م)",
+    "sea_level_pressure_hpa": "ضغط سطح البحر (هكتوباسكال)",
+    "temperature_c": "درجة الحرارة (°م)",
+    "visibility_m": "مدى الرؤية (م)",
+    "wind_speed_ms": "سرعة الرياح (م/ث)",
+}
+SPLIT_AR = {
+    "seen_time_holdout": "محطات سبق رصدها",
+    "unseen_station": "محطات جديدة / غير مرئية",
+}
+REASON_AR = {
+    "missing": "قيمة مفقودة",
+    "combined contextual anomaly": "شذوذ سياقي مركب",
+    "temporal deviation": "انحراف زمني",
+    "gradual drift": "انجراف تدريجي",
+    "level shift": "تحول في المستوى",
+    "stuck/variance collapse": "ثبات / انهيار التباين",
+    "noise escalation": "تصاعد الضوضاء",
+    "physical range": "تجاوز النطاق الفيزيائي",
+}
+STATUS_AR = {
+    "suggest correction": "مراجعة التصحيح المقترح",
+    "human review": "تتطلب مراجعة بشرية",
 }
 
 st.markdown("""
@@ -79,143 +104,57 @@ with overview:
     st.markdown(f'<div class="notice">{note}</div>', unsafe_allow_html=True)
 
     left, right = st.columns([1.45, 1])
-
     with left:
-        st.subheader(
-            "Station coverage" if not ar else "تغطية المحطات"
-        )
-
-        # Prepare one summary record for each station
+        st.subheader("Station coverage" if not ar else "تغطية المحطات")
         station_map = (
-            alerts.groupby(
-                [
-                    "station_id",
-                    "station_name",
-                    "latitude",
-                    "longitude"
-                ],
-                as_index=False
-            )
-            .agg(
-                alert_count=("timestamp", "size"),
-                variable_count=("variable", "nunique"),
-                latest_alert=("timestamp", "max")
-            )
+            alerts.groupby(["station_id", "station_name", "latitude", "longitude"], as_index=False)
+            .agg(alert_count=("timestamp", "size"), variable_count=("variable", "nunique"),
+                 latest_alert=("timestamp", "max"))
         )
-
-        # Convert values to readable tooltip text
-        station_map["station_id"] = (
-            station_map["station_id"].astype(str)
-        )
-
-        station_map["latest_alert"] = (
-            pd.to_datetime(station_map["latest_alert"])
-            .dt.strftime("%Y-%m-%d %H:%M UTC")
-        )
-
-        # Interactive station points
+        station_map["station_id"] = station_map["station_id"].astype(str)
+        station_map["latest_alert"] = pd.to_datetime(
+            station_map["latest_alert"]
+        ).dt.strftime("%Y-%m-%d %H:%M UTC")
         station_layer = pdk.Layer(
-            "ScatterplotLayer",
-            data=station_map,
-            id="weather-stations",
-            get_position="[longitude, latitude]",
-            get_radius=18000,
-            get_fill_color="[15, 108, 189, 190]",
-            get_line_color="[255, 255, 255]",
-            line_width_min_pixels=1,
-            stroked=True,
-            filled=True,
-            pickable=True,
-            auto_highlight=True
+            "ScatterplotLayer", data=station_map, id="weather-stations",
+            get_position="[longitude, latitude]", get_radius=18000,
+            get_fill_color="[15, 108, 189, 190]", get_line_color="[255, 255, 255]",
+            line_width_min_pixels=1, stroked=True, filled=True,
+            pickable=True, auto_highlight=True,
         )
-
-        # Initial Saudi Arabia map position
-        view_state = pdk.ViewState(
-            latitude=24.5,
-            longitude=45.0,
-            zoom=4.2,
-            pitch=0
+        tooltip_html = (
+            "<b>{station_name}</b><br/>معرف المحطة: {station_id}<br/>"
+            "تنبيهات الجودة: {alert_count}<br/>المتغيرات: {variable_count}<br/>"
+            "أحدث تنبيه: {latest_alert}<br/>الموقع: {latitude}, {longitude}"
+            if ar else
+            "<b>{station_name}</b><br/>Station ID: {station_id}<br/>"
+            "Quality alerts: {alert_count}<br/>Variables: {variable_count}<br/>"
+            "Latest alert: {latest_alert}<br/>Location: {latitude}, {longitude}"
         )
-
-        # Tooltip shown when the mouse is placed over a station
-        tooltip = {
-            "html": """
-                <div style="font-family: Arial; line-height: 1.6;">
-                    <b style="font-size: 15px;">
-                        {station_name}
-                    </b>
-                    <br/>
-                    <b>Station ID:</b> {station_id}
-                    <br/>
-                    <b>Quality alerts:</b> {alert_count}
-                    <br/>
-                    <b>Variables:</b> {variable_count}
-                    <br/>
-                    <b>Latest alert:</b> {latest_alert}
-                    <br/>
-                    <b>Location:</b>
-                    {latitude}, {longitude}
-                </div>
-            """,
-            "style": {
-                "backgroundColor": "#0f4c5c",
-                "color": "white",
-                "borderRadius": "8px",
-                "padding": "8px"
-            }
-        }
-
-        station_deck = pdk.Deck(
+        deck = pdk.Deck(
             map_style=None,
-            initial_view_state=view_state,
+            initial_view_state=pdk.ViewState(latitude=24.5, longitude=45.0, zoom=4.2),
             layers=[station_layer],
-            tooltip=tooltip
+            tooltip={"html": tooltip_html,
+                     "style": {"backgroundColor": "#0f4c5c", "color": "white"}},
         )
-
-        st.pydeck_chart(
-            station_deck,
-            use_container_width=True,
-            height=430
-        )
-
-        st.caption(
-            "Move the pointer over a station to view its details."
-            if not ar
-            else
-            "ضع المؤشر فوق المحطة لعرض تفاصيلها."
-        )
-
+        st.pydeck_chart(deck, use_container_width=True, height=430)
+        st.caption("ضع المؤشر فوق المحطة لعرض تفاصيلها." if ar else
+                   "Hover over a station to view its details.")
     with right:
-        st.subheader(
-            "Alert composition"
-            if not ar
-            else "توزيع أسباب التنبيه"
-        )
+        st.subheader("Alert composition" if not ar else "توزيع أسباب التنبيه")
+        rc = alerts.reason.value_counts().rename_axis("Reason").reset_index(name="Alerts")
+        if ar:
+            rc["Reason"] = rc["Reason"].map(REASON_AR).fillna(rc["Reason"])
+            rc = rc.rename(columns={"Reason": "سبب التنبيه", "Alerts": "التنبيهات"})
+            fig = px.bar(rc.sort_values("التنبيهات"), x="التنبيهات", y="سبب التنبيه",
+                         orientation="h", color="التنبيهات", color_continuous_scale="Teal")
+        else:
+            fig = px.bar(rc.sort_values("Alerts"), x="Alerts", y="Reason", orientation="h",
+                         color="Alerts", color_continuous_scale="Teal")
+        fig.update_layout(coloraxis_showscale=False, margin=dict(l=10, r=10, t=10, b=10))
+        st.plotly_chart(fig, use_container_width=True)
 
-        rc = (
-            alerts.reason.value_counts()
-            .rename_axis("Reason")
-            .reset_index(name="Alerts")
-        )
-
-        fig = px.bar(
-            rc.sort_values("Alerts"),
-            x="Alerts",
-            y="Reason",
-            orientation="h",
-            color="Alerts",
-            color_continuous_scale="Teal"
-        )
-
-        fig.update_layout(
-            coloraxis_showscale=False,
-            margin=dict(l=10, r=10, t=10, b=10)
-        )
-
-        st.plotly_chart(
-            fig,
-            use_container_width=True
-        )
     st.subheader("Stations in the prototype" if not ar else "المحطات في النموذج الأولي")
     station_summary = (
         alerts.groupby(["station_name", "station_id"], as_index=False)
@@ -223,22 +162,32 @@ with overview:
         .rename(columns={"station_name": "Station", "station_id": "Station ID"})
         .sort_values("Alerts", ascending=False)
     )
+    if ar:
+        station_summary = station_summary.rename(columns={
+            "Station": "المحطة", "Station ID": "معرف المحطة",
+            "Alerts": "التنبيهات", "Latest alert": "أحدث تنبيه"
+        })
     st.dataframe(station_summary, use_container_width=True, hide_index=True)
 
 with explorer:
     st.subheader("Investigate and export alerts" if not ar else "استعراض التنبيهات وتصديرها")
     x1, x2, x3 = st.columns(3)
     stations = x1.multiselect("Stations" if not ar else "المحطات",
-                              sorted(alerts.station_name.unique()), placeholder="All stations")
+                              sorted(alerts.station_name.unique()),
+                              placeholder="All stations" if not ar else "جميع المحطات")
     variables = x2.multiselect("Variables" if not ar else "المتغيرات",
-                               sorted(alerts.variable.unique()), format_func=lambda x: VAR.get(x, x),
-                               placeholder="All variables")
+                               sorted(alerts.variable.unique()),
+                               format_func=(lambda x: VAR_AR.get(x, x)) if ar else (lambda x: VAR.get(x, x)),
+                               placeholder="All variables" if not ar else "جميع المتغيرات")
     reasons = x3.multiselect("Alert reasons" if not ar else "أسباب التنبيه",
-                             sorted(alerts.reason.unique()), placeholder="All reasons")
+                             sorted(alerts.reason.unique()),
+                             format_func=(lambda x: REASON_AR.get(x, x)) if ar else (lambda x: x),
+                             placeholder="All reasons" if not ar else "جميع الأسباب")
     x4, x5 = st.columns([1, 2])
     statuses = x4.multiselect("Review status" if not ar else "حالة المراجعة",
-                              sorted(alerts.status.unique()), format_func=lambda x: STATUS.get(x, x),
-                              placeholder="All statuses")
+                              sorted(alerts.status.unique()),
+                              format_func=(lambda x: STATUS_AR.get(x, x)) if ar else (lambda x: STATUS.get(x, x)),
+                              placeholder="All statuses" if not ar else "جميع الحالات")
     min_prob = x5.slider("Minimum alert probability" if not ar else "الحد الأدنى لاحتمال التنبيه",
                          0.0, 1.0, 0.0, 0.05)
 
@@ -248,22 +197,36 @@ with explorer:
     if reasons: filtered = filtered[filtered.reason.isin(reasons)]
     if statuses: filtered = filtered[filtered.status.isin(statuses)]
     filtered = filtered[filtered.prob_fusion >= min_prob].copy()
-    filtered["variable"] = filtered.variable.map(VAR).fillna(filtered.variable)
-    filtered["status"] = filtered.status.map(STATUS).fillna(filtered.status)
-    filtered = filtered.rename(columns={
+    filtered["variable"] = filtered.variable.map(VAR_AR if ar else VAR).fillna(filtered.variable)
+    filtered["status"] = filtered.status.map(STATUS_AR if ar else STATUS).fillna(filtered.status)
+    if ar:
+        filtered["reason"] = filtered.reason.map(REASON_AR).fillna(filtered.reason)
+    english_columns = {
         "timestamp": "Timestamp (UTC)", "station_name": "Station", "variable": "Variable",
         "observed_value": "Observed value", "corrected_v3": "Proposed value",
         "selected_correction_method": "Proposed method",
         "correction_confidence": "Proposal confidence", "prob_fusion": "Alert probability",
         "reason": "Reason", "status": "Review status",
-    })
-    st.caption(f"{len(filtered):,} matching alerts")
-    visible = ["Timestamp (UTC)", "Station", "Variable", "Observed value", "Proposed value",
-               "Alert probability", "Reason", "Review status"]
+    }
+    arabic_columns = {
+        "timestamp": "الوقت (UTC)", "station_name": "المحطة", "variable": "المتغير",
+        "observed_value": "القيمة المرصودة", "corrected_v3": "القيمة المقترحة",
+        "selected_correction_method": "الطريقة المقترحة",
+        "correction_confidence": "ثقة الاقتراح", "prob_fusion": "احتمال التنبيه",
+        "reason": "السبب", "status": "حالة المراجعة",
+    }
+    filtered = filtered.rename(columns=arabic_columns if ar else english_columns)
+    st.caption(f"{len(filtered):,} تنبيهاً مطابقاً" if ar else f"{len(filtered):,} matching alerts")
+    visible = (["الوقت (UTC)", "المحطة", "المتغير", "القيمة المرصودة", "القيمة المقترحة",
+                "احتمال التنبيه", "السبب", "حالة المراجعة"] if ar else
+               ["Timestamp (UTC)", "Station", "Variable", "Observed value", "Proposed value",
+                "Alert probability", "Reason", "Review status"])
+    time_col = "الوقت (UTC)" if ar else "Timestamp (UTC)"
+    prob_col = "احتمال التنبيه" if ar else "Alert probability"
     st.dataframe(
-        filtered[visible].sort_values("Timestamp (UTC)", ascending=False),
+        filtered[visible].sort_values(time_col, ascending=False),
         use_container_width=True, hide_index=True,
-        column_config={"Alert probability": st.column_config.ProgressColumn(
+        column_config={prob_col: st.column_config.ProgressColumn(
             format="%.2f", min_value=0, max_value=1)}
     )
     st.download_button(
@@ -280,12 +243,14 @@ with explorer:
 with evaluation:
     st.subheader("Detection performance" if not ar else "أداء اكتشاف الأعطال")
     m = metrics[metrics.method == "MeteoGuard V3"].copy()
-    m["Variable"] = m.variable.map(VAR)
-    m["Validation setting"] = m.split.map(SPLIT)
-    fig = px.bar(m, x="Variable", y="f1", color="Validation setting", barmode="group",
-                 range_y=[0, 1], labels={"f1": "F1 score"},
+    var_col = "المتغير" if ar else "Variable"
+    split_col = "إعداد التحقق" if ar else "Validation setting"
+    m[var_col] = m.variable.map(VAR_AR if ar else VAR)
+    m[split_col] = m.split.map(SPLIT_AR if ar else SPLIT)
+    fig = px.bar(m, x=var_col, y="f1", color=split_col, barmode="group",
+                 range_y=[0, 1], labels={"f1": "درجة F1" if ar else "F1 score"},
                  color_discrete_sequence=["#0f6cbd", "#6bb7e9"], text_auto=".2f")
-    fig.update_layout(legend_title_text="Validation setting", margin=dict(l=10, r=10, t=20, b=10))
+    fig.update_layout(legend_title_text=split_col, margin=dict(l=10, r=10, t=20, b=10))
     st.plotly_chart(fig, use_container_width=True)
     st.caption(
         "F1 balances fault-detection precision and recall; higher values indicate more reliable detection."
@@ -293,19 +258,22 @@ with evaluation:
         "توازن درجة F1 بين دقة الكشف والاستدعاء؛ وتشير القيم الأعلى إلى كشف أكثر موثوقية."
     )
     q1, q2, q3 = st.columns(3)
-    q1.metric("Mean F1 — observed stations", f"{m.loc[m.split == 'seen_time_holdout', 'f1'].mean():.3f}")
-    q2.metric("Mean F1 — unseen stations", f"{m.loc[m.split == 'unseen_station', 'f1'].mean():.3f}")
-    q3.metric("Maximum false-positive rate", f"{m.false_positive_rate.max():.1%}")
+    q1.metric("متوسط F1 — المحطات المرصودة" if ar else "Mean F1 — observed stations",
+              f"{m.loc[m.split == 'seen_time_holdout', 'f1'].mean():.3f}")
+    q2.metric("متوسط F1 — المحطات الجديدة" if ar else "Mean F1 — unseen stations",
+              f"{m.loc[m.split == 'unseen_station', 'f1'].mean():.3f}")
+    q3.metric("أقصى معدل للإنذارات الكاذبة" if ar else "Maximum false-positive rate",
+              f"{m.false_positive_rate.max():.1%}")
 
     st.subheader("Preservation of legitimate extremes" if not ar else "الحفاظ على الظواهر المتطرفة الحقيقية")
     e = extremes.copy()
-    e["Variable"] = e.variable.map(VAR)
-    e["Validation setting"] = e.split.map(SPLIT)
-    fig2 = px.bar(e, x="Variable", y="preservation_rate", color="Validation setting",
+    e[var_col] = e.variable.map(VAR_AR if ar else VAR)
+    e[split_col] = e.split.map(SPLIT_AR if ar else SPLIT)
+    fig2 = px.bar(e, x=var_col, y="preservation_rate", color=split_col,
                   barmode="group", range_y=[0, 1],
-                  labels={"preservation_rate": "Preservation rate"},
+                  labels={"preservation_rate": "معدل الحفاظ" if ar else "Preservation rate"},
                   color_discrete_sequence=["#198754", "#7bcf9b"], text_auto=".1%")
-    fig2.update_layout(legend_title_text="Validation setting", margin=dict(l=10, r=10, t=20, b=10))
+    fig2.update_layout(legend_title_text=split_col, margin=dict(l=10, r=10, t=20, b=10))
     st.plotly_chart(fig2, use_container_width=True)
     st.warning(
         "Generalization differs by variable: pressure and wind transfer strongly to unseen stations, "
@@ -329,6 +297,12 @@ with about:
 - Nine stations and five meteorological variables
 - Time-held-out and entirely unseen-station evaluation
 - Research and hackathon testing prototype; not an operational NCM system
+
+### Project information
+- **Data source:** [NOAA/NCEI Global Hourly — Integrated Surface Database](https://www.ncei.noaa.gov/products/land-based-station/integrated-surface-database)
+- **Source repository:** [MeteoGuard AI on GitHub](https://github.com/mhammadpk/MeteoGuard_AI_V3_Streamlit_Dashboard)
+- **Organization:** First City Research & Innovation
+- **Project lead:** Dr. Muhammad Hammad
 """)
     else:
         st.markdown("""
@@ -343,6 +317,12 @@ with about:
 - تسع محطات وخمسة متغيرات جوية
 - تقييم زمني وتقييم على محطات غير مستخدمة في التدريب
 - نموذج بحثي واختباري للهاكاثون وليس نظاماً تشغيلياً
+
+### معلومات المشروع
+- **مصدر البيانات:** [قاعدة NOAA/NCEI العالمية للرصدات الساعية](https://www.ncei.noaa.gov/products/land-based-station/integrated-surface-database)
+- **المستودع البرمجي:** [MeteoGuard AI على GitHub](https://github.com/mhammadpk/MeteoGuard_AI_V3_Streamlit_Dashboard)
+- **الجهة:** البحث والابتكار — First City
+- **قائد المشروع:** د. محمد حماد
 """)
     st.info(
         "MeteoGuard AI supports quality-control decisions. Operational corrections require domain "
@@ -351,5 +331,7 @@ with about:
         "يدعم MeteoGuard AI قرارات مراقبة الجودة، وتتطلب التصحيحات التشغيلية تحقق المختص وسجل تدقيق وموافقة مالك البيانات."
     )
 
-st.markdown('<p class="small-note">MeteoGuard AI V3.1 · Research and hackathon prototype · Public NOAA-derived experimental data</p>',
+footer = ("MeteoGuard AI V3.2 · نموذج بحثي للهاكاثون · بيانات تجريبية مشتقة من NOAA العامة" if ar else
+          "MeteoGuard AI V3.2 · Research and hackathon prototype · Public NOAA-derived experimental data")
+st.markdown(f'<p class="small-note">{footer}</p>',
             unsafe_allow_html=True)
